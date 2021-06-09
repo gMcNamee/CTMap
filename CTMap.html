@@ -1,0 +1,493 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+    <title>
+      Test!
+    </title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.19/esri/themes/light/main.css"/>
+    <script src="https://js.arcgis.com/4.19/"></script>
+	<script
+		src="https://code.jquery.com/jquery-3.6.0.min.js"
+		integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+		crossorigin="anonymous">
+	</script>
+    <script>
+      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, geometryEngine) => {
+	  
+
+		let smRend = {
+			type: "unique-value",  
+			field: "FOREST_ORDER",
+			uniqueValueInfos: [{ 
+				value: "Future/Coming Order",
+				symbol: {
+					type: "simple-fill",
+					color: [0,0,255,0.25],
+					outline: {  
+						color: [0,0,255,1],
+						width: 1
+						}
+					}
+				}],
+			defaultSymbol: { 
+				type: "simple-fill",
+				color: [255,0,0,0.25],
+				outline: {  
+					color: [255,0,0,1],
+					width: 1
+					}
+				},  
+			};
+		let lgRend = {
+			type: "simple",  
+			symbol: {
+				type: "simple-fill",
+				color: [0,0,0,0],
+				outline: {  
+					color: [0,255,0,0],
+					width: 1
+					}
+				}
+			};
+		let forRend = {
+			type: "simple",  
+			symbol: {
+				type: "simple-fill",
+				color: [0,144,78,0.5],
+				outline: {  
+					color: [0,144,78,1],
+					width: 1
+					}
+				}
+			};
+
+	  
+	  
+//=================================================================================== Create Reference Layers
+		
+		const polyPopup = {
+			title: "<strong>{ORDERNAME}</strong>",
+			content: "<div>{FORESTNAME} Order<br/>"+"Order Number: {ORDERNUM}<br/><br/>{STATEMENT}<br/><br/>{DESCRIPTION}<br/><br/>"+
+			"Date Signed: {SIGNEDDATE}<br/>Start Date: {STARTDATE}<br/>End Date: {ENDDATE}<br/>Rescind Date: {RESCINDDATE}<br/><br/>For more information view the Forest Order:<br/><br/><br/>"+
+			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div>'
+		};
+		
+		const polyPopupMobile = {
+			title: "<strong>{ORDERNAME}</strong>",
+			content: "<div>{FORESTNAME} Order<br/>"+"Order Number: {ORDERNUM}<br/><br/>{STATEMENT}<br/><br/>{DESCRIPTION}<br/><br/>"+
+			"For more information view the Forest Order:<br/><br/><br/>"+
+			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div>'
+		};
+		// Create the FeatureLayer using the popupTemplate
+        const smOrderLayer = new FeatureLayer({
+			url: "https://apps.fs.usda.gov/fsgisx02/rest/services/r04/R04_Alerts_And_Closures_01/MapServer/0",
+			popupTemplate: polyPopup,
+			definitionExpression: "SHAPE.AREA < 485622771 AND (FOREST = 'CTF' OR FOREST = 'RO')",
+			renderer: smRend,
+			});
+		
+		// Create the FeatureLayer using the popupTemplate
+        const allOrderLayer = new FeatureLayer({
+			url: "https://apps.fs.usda.gov/fsgisx02/rest/services/r04/R04_Alerts_And_Closures_01/MapServer/0",
+			popupTemplate: polyPopup,
+			definitionExpression: "FOREST = 'CTF' OR FOREST = 'RO'",
+			renderer: lgRend,
+			outFields: ["FORESTNAME", "ORDERNAME","ORDERNUM","SHAPE.AREA"],
+			});
+		// Create the FeatureLayer using the popupTemplate
+        const forLayer = new FeatureLayer({
+			url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer/1",
+			definitionExpression: "FORESTNAME = 'Caribou-Targhee National Forest'",
+			renderer: forRend,
+			});
+		let baseLayers= new MapImageLayer({
+			url: "https://apps.fs.usda.gov/fsgisx05/rest/services/wo_nfs_gtac/EGIS_RecreationBasemap_01/MapServer",
+			sublayers: [
+				{
+					id: 0,
+					visible: true
+				}, {
+					id: 1,
+					visible: true
+				}, {
+					id: 2,
+					visible: true
+				}, {
+					id: 3,
+					visible: true
+				}, {
+					id: 4,
+					visible: true
+				}, {
+					id: 5,
+					visible: false
+				}, {
+					id: 6,
+					visible: true
+				}, {
+					id: 7,
+					visible: true
+				}, {
+					id: 8,
+					visible: false
+				}, {
+					id: 9,
+					visible: false
+				}, {
+					id: 10,
+					visible: false,
+				}, {
+					id: 11,
+					visible: false,
+				}
+			]
+		  });
+		  let baseRec= new MapImageLayer({
+			url: "https://apps.fs.usda.gov/fsgisx05/rest/services/wo_nfs_gtac/GTAC_IVMCartography_02/MapServer",
+			sublayers: [
+				{
+					id: 0,
+					visible: false
+				}, {
+					id: 1,
+					visible: true
+				}, {
+					id: 2,
+					visible: false
+				}
+			]
+		  });
+
+//=================================================================================== Create Map & View
+
+		const map = new Map({
+			basemap: "topo-vector",
+			layers: [forLayer,baseLayers,baseRec,allOrderLayer,smOrderLayer]
+        });
+        const view = new MapView({
+			container: "viewDiv",
+			map: map,
+			zoom: 8,
+			center: [-112, 43],
+			highlightOptions: {
+			   color: [255,0,0,.5]
+			}
+			});
+		view.ui.move("zoom", "bottom-right");
+		
+		const listNode = document.getElementById("ord_graphics");
+
+//=================================================================================== Build UI
+
+		// Help Expand
+		
+		var hDiv = document.getElementById("hDiv-large");
+		hDiv.style.display = "block";
+		const hexDiv = new Expand({
+			content: hDiv,
+			expandIconClass: "esri-icon-description",
+			view: view,
+			expandTooltip: "Expand For More Information",
+			group: "top-left"
+		});
+		view.ui.add(hexDiv, "top-left");
+
+//=================================================================================== Build List & Interactivity
+		
+		let graphics;
+		
+		function calcAcres(geom){
+			var tArea = geometryEngine.geodesicArea(geom, "acres");
+			var out = Math.round(tArea * 1000) / 1000;
+			console.log(out);
+			return out;
+		}
+
+        view.whenLayerView(allOrderLayer).then(function (layerView) {
+          layerView.watch("updating", function (value) {
+            if (!value) {
+              // wait for the layer view to finish updating
+              // query all the features available for drawing.
+              layerView
+                .queryFeatures({
+                  geometry: view.extent,
+                  returnGeometry: true,
+                  orderByFields: ["FORESTNAME DESC","ORDERNAME"]
+                })
+                .then(function (results) {
+					graphics = results.features;
+
+					const fragment = document.createDocumentFragment();
+
+					graphics.forEach(function (result, index) {
+						const attributes = result.attributes;
+						const geo = result.geometry;
+						const name = attributes.ORDERNAME;
+						const forest = attributes.FORESTNAME;
+						const ordNum = attributes.ORDERNUM;
+						console.log("geo: ",geo);
+						const area = calcAcres(geo);
+						let orderType;
+						
+						if (forest=='Intermountain Region' && area > 120000){orderType="Regional"}
+						else if (area > 120000){orderType="Forestwide or Districtwide"}
+						else {orderType="Site Specific Order"};
+
+						// Create a list zip codes in NY
+						const li = document.createElement("li");
+						li.classList.add("panel-result");
+						li.tabIndex = 0;
+						li.setAttribute("data-result-id", index);
+						li.innerHTML = "<strong>"+name+"</strong><br/>"+orderType+" Order<br/>Order Number: "+ordNum;
+
+						fragment.appendChild(li);
+					});
+					// Empty the current list
+					listNode.innerHTML = "";
+					listNode.appendChild(fragment);
+                })
+                .catch(function (error) {
+					console.error("query failed: ", error);
+					});
+				}
+          });
+        });
+
+        // listen to click event on the zip code list
+        listNode.addEventListener("click", onListClickHandler);
+		
+
+        function onListClickHandler(event) {
+			if ( $(window).width() < 900) {
+				hexDiv.expanded = false;
+				}
+          const target = event.target;
+          const resultId = target.getAttribute("data-result-id");
+
+          // get the graphic corresponding to the clicked zip code
+          const result =
+            resultId && graphics && graphics[parseInt(resultId, 10)];
+
+          if (result) {
+            // open the popup at the centroid of zip code polygon
+            // and set the popup's features which will populate popup content and title.
+
+            view
+              .goTo(result.geometry.extent.expand(2))
+              .then(function () {
+                view.popup.open({
+                  features: [result],
+                  location: result.geometry.centroid
+                });
+              })
+              .catch(function (error) {
+                if (error.name != "AbortError") {
+                  console.error(error);
+                }
+              });
+          }
+        }
+			
+//=================================================================================== Other Functionality		
+		
+		function resize() {
+			if ( $(window).width() > 900) {     
+				hexDiv.expanded = true;
+				view.popup = {
+					dockEnabled: true,
+					collapsed: false,
+					dockOptions: {
+						buttonEnabled: true,
+						breakpoint: false,
+						position: "top-right",
+						}
+					}
+				allOrderLayer.popupTemplate = polyPopup;
+				smOrderLayer.popupTemplate = polyPopup;
+				}
+			else {
+				hexDiv.expanded = false;
+				view.popup = {
+					dockEnabled: true,
+					collapsed: false,
+					collapseEnabled: false,
+					dockOptions: {
+						buttonEnabled: true,
+						breakpoint: false,
+						position: "top-right",
+						}
+					}
+				allOrderLayer.popupTemplate = polyPopupMobile;
+				smOrderLayer.popupTemplate = polyPopupMobile;
+				}
+			}
+		$(window).on("resize", resize);
+		resize(); // call once initially
+		orderListButton = document.getElementById('button-focus');
+		aboutButton = document.getElementById('button-about');
+		orderDiv = document.getElementById('for-ord-div');
+		aboutDiv = document.getElementById('about-div');
+		orderListButton.onclick = function () {
+			orderListButton.className = "topnav-active";
+			aboutButton.className = "topnav";
+			orderDiv.style.display = "block";
+			aboutDiv.style.display = "none";
+			
+		}
+		
+		aboutButton.onclick = function () {
+			orderListButton.className = "topnav";
+			aboutButton.className = "topnav-active";
+			orderDiv.style.display = "none";
+			aboutDiv.style.display = "block";
+		}
+		
+      });
+    </script>
+  </head>
+<style>
+	html,
+	body,
+	#viewDiv {
+		padding: 0;
+		margin: 0;
+		height: 100%;
+		width: 100%;
+		outline: none;
+		}
+	.esri-view-width-xlarge .esri-popup__main-container,
+	.esri-view-width-large .esri-popup__main-container,
+	.esri-view-width-medium .esri-popup__main-container	{
+		min-height: 475px !important;
+		}
+	.esri-view-width-small .esri-popup__main-container,
+	.esri-view-width-xsmall .esri-popup__main-container {
+		min-height: 375px !important;
+	}
+	#hDiv-large{
+		color: #404040;
+		background-color: #fff;
+		padding: 20px;
+		width: 25vw;
+		min-width: 450px;
+		height: 95vh;
+		font-size: 13px;
+		}
+
+	#list {
+		padding:0px;
+		display: block;
+		align-items: center;
+		justify-content: center;
+		}
+
+	.topnav {
+		color: black;
+		background-color: #ffffff;
+		border: 3px solid #00904e;
+		border-radius:0px;
+		text-align: center;
+		padding: 10px 10px;
+		margin: 5px;
+		text-decoration: none;
+		font-size: 14px;
+		width:47%;
+		min-width:150px;
+		}
+	.topnav-active{
+		color:#ffffff;
+		background-color:#00904e;
+		outline:none;
+		border: 3px solid #00904e;
+		border-radius:0px;
+		text-align: center;
+		padding: 10px 10px;
+		margin: 5px;
+		text-decoration: none;
+		font-size: 14px;
+		width:47%;
+		min-width:150px;
+		}
+
+	.topnav:hover {
+		background-color: #ddd;
+		color: black;
+		}
+	.panel-side {
+		max-height:60%;
+		overflow-y:scroll;
+		}
+	.panel-side ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		}
+
+	.panel-side li {
+		list-style: none;
+		border: 1px solid gray;
+		padding: 10px;
+		margin-bottom: 5px;
+		}
+
+	.panel-result {
+		cursor: pointer;
+		}
+
+	.panel-result:hover,
+	.panel-result:focus {
+
+		background-color: rgba(0, 0, 0, 0.15);
+		}
+	@media screen and (max-width: 900px) {
+		#hDiv-large{
+			width: 90vw;
+			height: 90vh;
+		}
+		.panel-side {
+			padding: 2px;
+			max-height:50%;
+			}
+	}
+		
+
+
+</style>
+  <body>
+  
+    <div id="viewDiv">
+		<div id="hDiv-large" style="display:none">
+			<div id="list">
+				<button id="button-focus" class="topnav-active" >Forestwide Order List</button>
+				<button id="button-about" class="topnav">About This Viewer</button>
+			</div>
+			<div id="for-ord-div">
+				<h3><strong>Welcome to our Forest Order Map!</strong></h3>
+				<p>This application displays Forest Orders across the forest as well as wider regional Orders. If you need help navigating the viewer, click the About This Viewer tab above.</p>
+				<h3><strong>Regional, Forest, and District Orders</strong></h3>
+				<p>Not all orders are shown on the map. Orders that cover the entire forest, a ranger district or the broader regional area are not displayed because they obscure smaller, site-specific Orders. </p>
+				<p>The list below contains the orders not displayed on the map. Select an order from the list to view more information in the Order Details panel on the right and see the geographic extent.</p>
+				<div class="panel-side esri-widget">
+					<ul id="ord_graphics">
+						<li>Loading List. This may take a few seconds. Please be patient.</li>
+					</ul>
+				</div>
+			</div>
+			<div id="about-div" style="display:none;">
+				<p>This application displays Forest Orders across the forest as well as wider regional Orders.</p>
+				<p>To navigate the map:</p>
+				<p> Click &amp; drag to pan  Use the zoom (+/-) buttons or use the scroll wheel on your mouse.</p>
+				<p> Once you locate the order you'd like to learn more about, click it to view more information in the Order Details panel.</p>
+				<p>To zoom to the Order from the Order Details panel, click the menu in the upper righthand corner of the Order Details panel (A in the image below) and then go to 'Zoom to'.</p>
+				<p>&#65279;Not all Orders are shown on the map. Orders that cover the entire forest, an entire ranger district or the broader regional area are not displayed because they obscure smaller, site-specific Orders.</p>
+				<p>To view Orders not displayed on this map, click the Forestwide Order List tab above.</p>
+				<p>Please note:</p>
+				<p>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit the that forest's website.</p
+				<p> This map is intended to be used as a supplement to the sign Forest Order. The signed Order document posted on the forest's website remains the authoritative source.</p>
+			</div>
+		</div>
+	</div>
+
+  </body>
+</html>
