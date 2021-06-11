@@ -12,10 +12,11 @@
 		integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
 		crossorigin="anonymous">
 	</script>
+	
     <script>
-      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/widgets/Search","esri/widgets/Locate","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, Search, Locate, geometryEngine) => {
-	  
-
+      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/widgets/Search","esri/widgets/Locate","esri/widgets/Legend","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, Search, Locate, Legend, geometryEngine) => {
+		
+		
 		let smRend = {
 			type: "unique-value",  
 			field: "FOREST_ORDER",
@@ -175,6 +176,8 @@
 		view.ui.move("zoom", "bottom-right");
 		
 		const listNode = document.getElementById("ord_graphics");
+		
+		
 
 //=================================================================================== Build UI
 
@@ -208,6 +211,19 @@
 			position: "top-right",
 			index: 1
 			});
+		
+		const legend = document.getElementById("leg")	
+		var legendExpand = new Expand({
+			  expandIconClass: "esri-icon-legend",  // see https://developers.arcgis.com/javascript/latest/guide/esri-icon-font/
+			  view: view,
+			  content: legend
+			});
+		view.ui.add(legendExpand,{
+			position: "top-right",
+			index: 2
+			});
+		console.log(legend);
+		
 		
 
 //=================================================================================== Build List & Interactivity
@@ -271,7 +287,11 @@
 
         // listen to click event on the zip code list
         listNode.addEventListener("click", onListClickHandler);
-		
+
+		legend.addEventListener("click", function(event){
+			console.log('here');
+			legend.style.display="block";
+		});
 
         function onListClickHandler(event) {
 			if ( $(window).width() < 900) {
@@ -338,7 +358,6 @@
 				}
 			}
 		
-		
 		$(window).on("resize", resize);
 		resize(); // call once initially
 		orderListButton = document.getElementById('button-focus');
@@ -370,6 +389,7 @@
 				aboutDivMobile.style.display = "block";
 				}
 		}
+
 		
       });
     </script>
@@ -383,6 +403,7 @@
 		height: 100%;
 		width: 100%;
 		outline: none;
+		background-color: #fff;
 		}
 	.esri-view-width-xlarge .esri-popup__main-container,
 	.esri-view-width-large .esri-popup__main-container,
@@ -474,6 +495,14 @@
 
 		background-color: rgba(0, 0, 0, 0.15);
 		}
+	#leg{
+		width:300px;
+		height:100%;
+		background-color: #ffffff;
+		}
+	.esri-expand__content{
+		background-color:#ffffff;
+		}
 	@media screen and (max-width: 900px) {
 		#hDiv-large{
 			width: 60vw;
@@ -523,6 +552,14 @@
 </style>
   <body>
     <div id="viewDiv">
+		<div id="leg">
+			<h4 style="margin-left:10px; margin-right:10px;">Legend</h4>
+			<div style="background-color: rgba(0, 0, 255,0.25); border:2px solid rgb(0, 0, 255); float:left; height:10px; margin: 5px 20px 0px 10px; width:40px;">&nbsp;</div>
+			<p style="padding: 0px 10px 0px 10px;">Future Forest Orders</p>
+
+			<div style="background-color: rgba(255,0,0,0.25); border:2px solid red; float:left; height:10px; margin: 10px 20px 0px 10px; width:40px;">&nbsp;</div>
+			<p style="margin-left:10px; padding:5px;">Current Forest Orders</p>
+		</div>
 		<div id="hDiv-large" style="display:none">
 			<div id="list">
 				<button id="button-focus" class="topnav-active" >Forest Order List</button>
