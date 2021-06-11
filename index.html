@@ -3,7 +3,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
     <title>
-      Test!
+      Forest Order Map
     </title>
     <link rel="stylesheet" href="https://js.arcgis.com/4.19/esri/themes/light/main.css"/>
     <script src="https://js.arcgis.com/4.19/"></script>
@@ -13,7 +13,7 @@
 		crossorigin="anonymous">
 	</script>
     <script>
-      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, geometryEngine) => {
+      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/widgets/Search","esri/widgets/Locate","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, Search, Locate, geometryEngine) => {
 	  
 
 		let smRend = {
@@ -61,8 +61,6 @@
 					}
 				}
 			};
-
-	  
 	  
 //=================================================================================== Create Reference Layers
 		
@@ -169,7 +167,7 @@
 			container: "viewDiv",
 			map: map,
 			zoom: 8,
-			center: [-112, 43],
+			center: [-112, 43.25],
 			highlightOptions: {
 			   color: [255,0,0,.5]
 			}
@@ -181,7 +179,6 @@
 //=================================================================================== Build UI
 
 		// Help Expand
-		
 		var hDiv = document.getElementById("hDiv-large");
 		hDiv.style.display = "block";
 		const hexDiv = new Expand({
@@ -192,15 +189,34 @@
 			group: "top-left"
 		});
 		view.ui.add(hexDiv, "top-left");
+		
+		const searchWidget = new Search({
+			view: view
+			});
+		// Adds the search widget below other elements in
+		// the top left corner of the view
+		view.ui.add(searchWidget, {
+			position: "top-right",
+			index: 0
+			});
+			
+		var locateWidget = new Locate({
+			view: view,   // Attaches the Locate button to the view
+			});
+
+		view.ui.add(locateWidget,{
+			position: "top-right",
+			index: 1
+			});
+		
 
 //=================================================================================== Build List & Interactivity
 		
 		let graphics;
-		
+				
 		function calcAcres(geom){
 			var tArea = geometryEngine.geodesicArea(geom, "acres");
 			var out = Math.round(tArea * 1000) / 1000;
-			console.log(out);
 			return out;
 		}
 
@@ -226,7 +242,6 @@
 						const name = attributes.ORDERNAME;
 						const forest = attributes.FORESTNAME;
 						const ordNum = attributes.ORDERNUM;
-						console.log("geo: ",geo);
 						const area = calcAcres(geo);
 						let orderType;
 						
@@ -322,25 +337,38 @@
 				smOrderLayer.popupTemplate = polyPopupMobile;
 				}
 			}
+		
+		
 		$(window).on("resize", resize);
 		resize(); // call once initially
 		orderListButton = document.getElementById('button-focus');
 		aboutButton = document.getElementById('button-about');
 		orderDiv = document.getElementById('for-ord-div');
 		aboutDiv = document.getElementById('about-div');
+		aboutDivMobile = document.getElementById('about-div-mobile');
+		
 		orderListButton.onclick = function () {
 			orderListButton.className = "topnav-active";
 			aboutButton.className = "topnav";
 			orderDiv.style.display = "block";
 			aboutDiv.style.display = "none";
+			aboutDivMobile.style.display = "none";
 			
 		}
 		
 		aboutButton.onclick = function () {
 			orderListButton.className = "topnav";
 			aboutButton.className = "topnav-active";
-			orderDiv.style.display = "none";
-			aboutDiv.style.display = "block";
+			if ( $(window).width() > 800) {
+				orderDiv.style.display = "none";
+				aboutDiv.style.display = "block";
+				aboutDivMobile.style.display = "none";
+				}
+			else {
+				orderDiv.style.display = "none";
+				aboutDiv.style.display = "none";
+				aboutDivMobile.style.display = "block";
+				}
 		}
 		
       });
@@ -363,8 +391,14 @@
 		}
 	.esri-view-width-small .esri-popup__main-container,
 	.esri-view-width-xsmall .esri-popup__main-container {
-		min-height: 375px !important;
+		position: absolute;
+		bottom: 0px;
+		right: 2.5%;
+		left: 2.5%;
+		width: 95%;
+		min-height: 400px;
 	}
+
 	#hDiv-large{
 		color: #404040;
 		background-color: #fff;
@@ -442,7 +476,7 @@
 		}
 	@media screen and (max-width: 900px) {
 		#hDiv-large{
-			width: 90vw;
+			width: 60vw;
 			height: 90vh;
 		}
 		.panel-side {
@@ -450,16 +484,48 @@
 			max-height:50%;
 			}
 	}
+	@media screen and (max-width: 600px) {
+		.esri-view-height-small .esri-ui-corner .esri-component .esri-expand__content{
+			max-width:90vw;
+			margin-left: 2vw;
+		}
+		#hDiv-large{
+			min-width: 270px;
+			width: 90vw;
+			height: 90vh;
+			left: 0px;
+		}
+		esri-ui-inner-container esri-ui-corner-container{
+			inset: 6px;
+			}
+		.esri-expand__content--expanded{
+			boxshadow: none;
+			maring:0px;	
+			}
+		.esri-expand__content--expanded{
+			margin-left:0px;
+			}
+		.panel-side {
+			max-height:50%;
+			}
+		.topnav {
+			width: 100%;
+			}
+		.topnav-active {
+			width: 100%;
+			}
+	}
+	
+	
 		
 
 
 </style>
   <body>
-  
     <div id="viewDiv">
 		<div id="hDiv-large" style="display:none">
 			<div id="list">
-				<button id="button-focus" class="topnav-active" >Forestwide Order List</button>
+				<button id="button-focus" class="topnav-active" >Forest Order List</button>
 				<button id="button-about" class="topnav">About This Viewer</button>
 			</div>
 			<div id="for-ord-div">
@@ -467,7 +533,7 @@
 				<p>This application displays Forest Orders across the forest as well as wider regional Orders. If you need help navigating the viewer, click the About This Viewer tab above.</p>
 				<h3><strong>Regional, Forest, and District Orders</strong></h3>
 				<p>Not all orders are shown on the map. Orders that cover the entire forest, a ranger district or the broader regional area are not displayed because they obscure smaller, site-specific Orders. </p>
-				<p>The list below contains the orders not displayed on the map. Select an order from the list to view more information in the Order Details panel on the right and see the geographic extent.</p>
+				<p>The list below contains all Orders on the forest. Select an order from the list to view more information in the Order Details panel on the right and see the geographic extent.</p>
 				<div class="panel-side esri-widget">
 					<ul id="ord_graphics">
 						<li>Loading List. This may take a few seconds. Please be patient.</li>
@@ -485,6 +551,21 @@
 				<p>Please note:</p>
 				<p>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit the that forest's website.</p
 				<p> This map is intended to be used as a supplement to the sign Forest Order. The signed Order document posted on the forest's website remains the authoritative source.</p>
+			</div>
+			<div id="about-div-mobile" style="display:none;">
+				<p>This application displays Forest Orders across the forest as well as wider regional Orders.</p>
+				<p>To navigate the map:</p>
+				<ul>
+					<li>Tap &amp; drag to pan.</li>
+					<li>Use the zoom (+/-) buttons, pinch &amp; zoom, or double tap to zoom.</li>
+				</ul>
+				<p>Once you locate the order you'd like to learn more about, tap it to view more information in the popup panel.</p>
+				<p>Not all Orders are symbolized on the map. Orders that cover the entire forest, an entire ranger district or the broader regional area are not symbolized because they obscure smaller, site-specific Orders.</p>
+				<p>However when an area is clicked or tapped, all orders that apply to that specific location will be selected, including those that are not symbolized. Scroll through them by using the selection toggle (&#9665; 1 of 9 &#9655;) in the popup.</p>
+				<p>Additionally, all orders, including those that are not symbolized, are included in the Forest Order List.
+				<p>Please note:</p>
+				<p><i>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit the that forest's website.</i></p>
+				<p><i> This map is intended to be used as a supplement to the sign Forest Order. The signed Order document posted on the forest's website remains the authoritative source.<i></p>
 			</div>
 		</div>
 	</div>
