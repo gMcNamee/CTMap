@@ -3,7 +3,7 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
     <title>
-      Forest Order Map
+		Forest Order Map
     </title>
     <link rel="stylesheet" href="https://js.arcgis.com/4.19/esri/themes/light/main.css"/>
     <script src="https://js.arcgis.com/4.19/"></script>
@@ -14,8 +14,16 @@
 	</script>
 	
     <script>
-      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Expand","esri/widgets/Search","esri/widgets/Locate","esri/widgets/Legend","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Expand, Search, Locate, Legend, geometryEngine) => {
+      require(["esri/Map", "esri/views/MapView", "esri/layers/FeatureLayer","esri/layers/MapImageLayer","esri/widgets/Feature","esri/widgets/Expand","esri/widgets/Search","esri/widgets/Locate","esri/widgets/Legend","esri/geometry/geometryEngine"], (Map, MapView, FeatureLayer, MapImageLayer, Feature, Expand, Search, Locate, Legend, geometryEngine) => {
 		
+		var storedValues = {
+			mp: 0,
+			sp: 0,
+			i: 0,
+			nof: 0,
+			feats: 0};
+		
+//=================================================================================== Renderers		
 		
 		let smRend = {
 			type: "unique-value",  
@@ -69,14 +77,14 @@
 			title: "<strong>{ORDERNAME}</strong>",
 			content: "<div>{FORESTNAME} Order<br/>"+"Order Number: {ORDERNUM}<br/><br/>{STATEMENT}<br/><br/>{DESCRIPTION}<br/><br/>"+
 			"Date Signed: {SIGNEDDATE}<br/>Start Date: {STARTDATE}<br/>End Date: {ENDDATE}<br/>Rescind Date: {RESCINDDATE}<br/><br/>For more information view the Forest Order:<br/><br/><br/>"+
-			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div>'
+			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div><br/>'
 		};
 		
 		const polyPopupMobile = {
 			title: "<strong>{ORDERNAME}</strong>",
-			content: "<div>{FORESTNAME} Order<br/>"+"Order Number: {ORDERNUM}<br/><br/>{STATEMENT}<br/><br/>{DESCRIPTION}<br/><br/>"+
+			content: "<div>{FORESTNAME} Order<br/>"+"Order Number: {ORDERNUM}<br/><br/>{STATEMENT}<br/><br/>"+
 			"For more information view the Forest Order:<br/><br/><br/>"+
-			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div>'
+			'<strong><a href="{HYPERLINK}" rel="nofollow ugc" style="text-decoration: none; background-color:#00904e ;padding:10px; color:white;">View Forest Order</a></strong></div><br/>'
 		};
 		// Create the FeatureLayer using the popupTemplate
         const smOrderLayer = new FeatureLayer({
@@ -99,6 +107,7 @@
 			url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer/1",
 			definitionExpression: "FORESTNAME = 'Caribou-Targhee National Forest'",
 			renderer: forRend,
+			minScale:20000000,
 			});
 		let baseLayers= new MapImageLayer({
 			url: "https://apps.fs.usda.gov/fsgisx05/rest/services/wo_nfs_gtac/EGIS_RecreationBasemap_01/MapServer",
@@ -170,20 +179,20 @@
 			zoom: 8,
 			center: [-112, 43.25],
 			highlightOptions: {
-			   color: [255,0,0,.5]
+			   color: [255,200,0],
+			   fillOpacity: 0.25
 			}
 			});
-		view.ui.move("zoom", "bottom-right");
-		
+		view.ui.move("zoom", "top-left");
+		view.popup.autoOpenEnabled = false;
+		view.ui.remove("attribution");
 		const listNode = document.getElementById("ord_graphics");
 		
-		
-
 //=================================================================================== Build UI
 
 		// Help Expand
 		var hDiv = document.getElementById("hDiv-large");
-		hDiv.style.display = "block";
+		
 		const hexDiv = new Expand({
 			content: hDiv,
 			expandIconClass: "esri-icon-description",
@@ -191,7 +200,10 @@
 			expandTooltip: "Expand For More Information",
 			group: "top-left"
 		});
-		view.ui.add(hexDiv, "top-left");
+		view.ui.add(hexDiv, {
+			position: "top-left",
+			index: 0
+			});
 		
 		const searchWidget = new Search({
 			view: view
@@ -222,68 +234,187 @@
 			position: "top-right",
 			index: 2
 			});
-		console.log(legend);
-		
-		
 
 //=================================================================================== Build List & Interactivity
 		
 		let graphics;
+		let highlight;
+		
+		var dets = document.getElementById("details");
 				
 		function calcAcres(geom){
 			var tArea = geometryEngine.geodesicArea(geom, "acres");
 			var out = Math.round(tArea * 1000) / 1000;
 			return out;
 		}
-
-        view.whenLayerView(allOrderLayer).then(function (layerView) {
-          layerView.watch("updating", function (value) {
-            if (!value) {
-              // wait for the layer view to finish updating
-              // query all the features available for drawing.
-              layerView
-                .queryFeatures({
-                  geometry: view.extent,
-                  returnGeometry: true,
-                  orderByFields: ["FORESTNAME DESC","ORDERNAME"]
-                })
-                .then(function (results) {
-					graphics = results.features;
-
-					const fragment = document.createDocumentFragment();
-
-					graphics.forEach(function (result, index) {
-						const attributes = result.attributes;
-						const geo = result.geometry;
-						const name = attributes.ORDERNAME;
-						const forest = attributes.FORESTNAME;
-						const ordNum = attributes.ORDERNUM;
-						const area = calcAcres(geo);
-						let orderType;
-						
-						if (forest=='Intermountain Region' && area > 120000){orderType="Regional"}
-						else if (area > 120000){orderType="Forestwide or Districtwide"}
-						else {orderType="Site Specific Order"};
-
-						// Create a list zip codes in NY
-						const li = document.createElement("li");
-						li.classList.add("panel-result");
-						li.tabIndex = 0;
-						li.setAttribute("data-result-id", index);
-						li.innerHTML = "<strong>"+name+"</strong><br/>"+orderType+" Order<br/>Order Number: "+ordNum;
-
-						fragment.appendChild(li);
-					});
-					// Empty the current list
-					listNode.innerHTML = "";
-					listNode.appendChild(fragment);
-                })
-                .catch(function (error) {
-					console.error("query failed: ", error);
-					});
+		
+		const graphic = {
+			popupTemplate: {
+				content: "Click on any order on the map for more information."
 				}
-          });
-        });
+			};
+			// Provide graphic to a new instance of a Feature widget
+		const feature = new Feature({
+			container: "feature-node",
+			graphic: graphic,
+			map: view.map,
+			spatialReference: view.spatialReference
+			});
+		
+		view.when().then(function () {
+			legend.style.display = "block";
+			hDiv.style.display = "block";
+			// Create a default graphic for when the application starts
+			view.whenLayerView(allOrderLayer).then(function (layerView) {
+				  // listen for the pointer-move event on the View
+				  view.on("click", function (event) {
+					// Perform a hitTest on the View
+					unselectFeature();
+					view.hitTest(event).then(function (response) {
+						// Make sure graphic has a popupTemplate
+						let results = response.results.filter(function (result) {
+							return polyPopup;
+							});
+						// First Result is Forest Order Layer
+						let result = results[0];
+						highlight && highlight.remove();
+						// Update the graphic of the Feature widget
+						// on pointer-move with the result
+						
+						if (result) {
+							feature.graphic = result.graphic;
+							highlight = layerView.highlight(result.graphic);
+							if (!result.graphic.geometry){
+								navNums.innerHTML = "0 of 0";
+								document.getElementById("next").disabled = true;
+								document.getElementById("prev").disabled = true;
+								}
+							if ($(window).width() > 600) {
+								dets.style.height = "500px";
+								}
+							} 
+						else {
+							feature.graphic = graphic;
+							dets.style.height = "auto";
+							}
+						storedValues = {mp: 0, sp: 0, i: 0, nof: 0};
+						allOrderLayer.queryFeatures({geometry: event.mapPoint, outFields: ["*"]}).then(function(results) {
+							storeValues(event.mapPoint,response.screenPoint,0,results.features);
+							activatePopup();
+							});
+					});
+				  });
+				  
+			  layerView.watch("updating", function (value) {
+				if (!value) {
+				  // wait for the layer view to finish updating
+				  // query all the features available for drawing.
+				  layerView
+					.queryFeatures({
+					  geometry: view.extent,
+					  returnGeometry: true,
+					  orderByFields: ["FORESTNAME DESC","ORDERNAME"]
+					})
+					.then(function (results) {
+						graphics = results.features;
+
+						const fragment = document.createDocumentFragment();
+
+						graphics.forEach(function (result, index) {
+							const attributes = result.attributes;
+							const geo = result.geometry;
+							const name = attributes.ORDERNAME;
+							const forest = attributes.FORESTNAME;
+							const ordNum = attributes.ORDERNUM;
+							const area = calcAcres(geo);
+							let orderType;
+							
+							if (forest=='Intermountain Region' && area > 120000){orderType="Regional"}
+							else if (area > 120000){orderType="Forestwide or Districtwide"}
+							else {orderType="Site Specific Order"};
+
+							// Create a list zip codes in NY
+							const li = document.createElement("li");
+							li.classList.add("panel-result");
+							li.tabIndex = 0;
+							li.setAttribute("data-result-id", index);
+							li.innerHTML = "<strong>"+name+"</strong><br/>"+orderType+" Order<br/>Order Number: "+ordNum;
+
+							fragment.appendChild(li);
+						});
+						// Empty the current list
+						listNode.innerHTML = "";
+						listNode.appendChild(fragment);
+					})
+					.catch(function (error) {
+						console.error("query failed: ", error);
+						});
+					}
+			  });
+			});
+		});
+		
+		var next = document.getElementById("next");
+		var prev = document.getElementById("prev");
+		
+		prev.addEventListener("click", function(){
+			unselectFeature();
+			if (storedValues.i+1 == storedValues.nof){
+				storedValues.i = 0;
+				}
+			else {
+				storedValues.i += 1;
+				}
+			feature.graphic = storedValues.feats[storedValues.i];
+			highlightFeature(storedValues.feats[storedValues.i]);
+			activatePopup();
+			
+		});
+
+		next.addEventListener("click", function(){
+			unselectFeature();
+			if (storedValues.i+1 == 1){
+				storedValues.i = storedValues.nof-1;
+				}
+			else {
+				storedValues.i -= 1;
+				}
+			feature.graphic = storedValues.feats[storedValues.i];
+			highlightFeature(storedValues.feats[storedValues.i]);
+			activatePopup();
+		});
+		
+		function storeValues(mp,sp,index,feats){
+			storedValues.mp = mp;
+			storedValues.sp = sp;
+			storedValues.i = index;
+			storedValues.nof = feats.length;
+			storedValues.feats = feats;
+			}
+		
+		function activatePopup(){
+			if (storedValues.nof > 1){
+				document.getElementById("next").disabled = false;
+				document.getElementById("prev").disabled = false;
+				var navNums = document.getElementById("navNums");
+				navNums.innerHTML = storedValues.i+1+" of "+storedValues.nof;
+				}
+			else {
+				document.getElementById("next").disabled = true;
+				document.getElementById("prev").disabled = true;
+				}
+			}
+		
+		function highlightFeature(f){
+			view.whenLayerView(f.layer).then(function(layerView) {
+				highlight = layerView.highlight(f);
+				});
+			}
+		function unselectFeature() {
+			if (highlight) {
+				highlight.remove();
+				}
+			}
 
         // listen to click event on the zip code list
         listNode.addEventListener("click", onListClickHandler);
@@ -292,8 +423,9 @@
 			console.log('here');
 			legend.style.display="block";
 		});
-
+		
         function onListClickHandler(event) {
+			unselectFeature();
 			if ( $(window).width() < 900) {
 				hexDiv.expanded = false;
 				}
@@ -305,61 +437,47 @@
             resultId && graphics && graphics[parseInt(resultId, 10)];
 
           if (result) {
-            // open the popup at the centroid of zip code polygon
-            // and set the popup's features which will populate popup content and title.
 
-            view
-              .goTo(result.geometry.extent.expand(2))
-              .then(function () {
-                view.popup.open({
-                  features: [result],
-                  location: result.geometry.centroid
-                });
-              })
-              .catch(function (error) {
-                if (error.name != "AbortError") {
-                  console.error(error);
-                }
-              });
+			feature.graphic = graphics[parseInt(resultId, 10)];
+			highlightFeature(graphics[parseInt(resultId, 10)]);
+			navNums.innerHTML = "1 of 1";
+			document.getElementById("next").disabled = true;
+			document.getElementById("prev").disabled = true;
+            view.goTo(result.geometry.extent)
+		  .catch(function (error) {
+			if (error.name != "AbortError") {
+			  console.error(error);
+			}
+		  });
           }
         }
 			
 //=================================================================================== Other Functionality		
+		var popCont = document.getElementById('popContainer');
+		hexDiv.on("click", function(){
+			console.log('here');
+			if ($(window).width() > 600) {
+				if (hexDiv.expanded == true){
+					popCont.style.display = none;
+					}
+				}
+			});
+				
+		
 		
 		function resize() {
-			if ( $(window).width() > 900) {     
+			if ($(window).width() > 900) {     
 				hexDiv.expanded = true;
-				view.popup = {
-					dockEnabled: true,
-					collapsed: false,
-					dockOptions: {
-						buttonEnabled: true,
-						breakpoint: false,
-						position: "top-right",
-						}
-					}
-				allOrderLayer.popupTemplate = polyPopup;
-				smOrderLayer.popupTemplate = polyPopup;
 				}
 			else {
 				hexDiv.expanded = false;
-				view.popup = {
-					dockEnabled: true,
-					collapsed: false,
-					collapseEnabled: false,
-					dockOptions: {
-						buttonEnabled: true,
-						breakpoint: false,
-						position: "top-right",
-						}
-					}
 				allOrderLayer.popupTemplate = polyPopupMobile;
-				smOrderLayer.popupTemplate = polyPopupMobile;
 				}
 			}
 		
 		$(window).on("resize", resize);
 		resize(); // call once initially
+		
 		orderListButton = document.getElementById('button-focus');
 		aboutButton = document.getElementById('button-about');
 		orderDiv = document.getElementById('for-ord-div');
@@ -372,7 +490,6 @@
 			orderDiv.style.display = "block";
 			aboutDiv.style.display = "none";
 			aboutDivMobile.style.display = "none";
-			
 		}
 		
 		aboutButton.onclick = function () {
@@ -389,36 +506,66 @@
 				aboutDivMobile.style.display = "block";
 				}
 		}
-
 		
+		var hideButton = document.getElementById("minus-btn");
+		var showButton = document.getElementById("plus-btn");
+		
+		hideButton.onclick = function() {
+			dets.style.display = "none";
+			hideButton.style.display = "none";
+			showButton.style.display = "inline-block";
+			}
+		showButton.onclick = function() {
+			dets.style.display = "block";
+			showButton.style.display = "none";
+			hideButton.style.display = "inline-block";
+			}
+		var checkBox = document.getElementById("check");
+		var okButton = document.getElementById("ok-btn");
+		checkBox.addEventListener("change", function(event){
+			if (checkBox.checked == true){
+				okButton.disabled = false;
+				}
+			else {
+				okButton.disabled = true;
+				}
+			});
+		// When the user clicks the button, open the modal
+		var modal = document.getElementById("myModal");
+		okButton.onclick = function() {
+			console.log("here");
+			modal.style.display = "none";
+			}
+				
+			
       });
     </script>
   </head>
 <style>
+	.esri-view .esri-view-surface--inset-outline:focus::after {outline: none !important;}
+	.esri-ui{z-index: 1;}
 	html,
-	body,
-	#viewDiv {
-		padding: 0;
+	body{
 		margin: 0;
 		height: 100%;
-		width: 100%;
+		outline: none;
+		}
+	.box{
+		display: flex;
+		flex-flow: column;
+		height: 100%;
+		}
+	.box #header{
+		flex: 0 1 100px;
+		background-color: #00904e;
+		}
+	#viewDiv {
+		flex: 1 1 auto;
+		padding: 0;
+		margin: 0;
 		outline: none;
 		background-color: #fff;
 		}
-	.esri-view-width-xlarge .esri-popup__main-container,
-	.esri-view-width-large .esri-popup__main-container,
-	.esri-view-width-medium .esri-popup__main-container	{
-		min-height: 475px !important;
-		}
-	.esri-view-width-small .esri-popup__main-container,
-	.esri-view-width-xsmall .esri-popup__main-container {
-		position: absolute;
-		bottom: 0px;
-		right: 2.5%;
-		left: 2.5%;
-		width: 95%;
-		min-height: 400px;
-	}
 
 	#hDiv-large{
 		color: #404040;
@@ -492,7 +639,6 @@
 
 	.panel-result:hover,
 	.panel-result:focus {
-
 		background-color: rgba(0, 0, 0, 0.15);
 		}
 	#leg{
@@ -502,6 +648,152 @@
 		}
 	.esri-expand__content{
 		background-color:#ffffff;
+		}
+		
+	#feature-node {
+		padding: 1em;
+		}
+	
+	.svg-plus { height: 20px; stroke: #000000; }
+	#plus-btn,
+	#minus-btn{
+		background-color: #ffffff;
+		border: none;
+	}
+	
+	#popContainer {
+		font-family:'Avenir Next', 'Avenir', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+		font-size:13px;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+		border: #d9d9d9 1px solid;
+		background-color: #ffffff;
+		min-width:300px;
+		width: 25%;
+		position: absolute;
+		bottom: 15px;
+		right: 15px;
+		padding: 10px;
+		}
+	
+	#popContainer a{
+		text-decoration: none;
+		}
+	#popContainer span{
+		vertical-align: middle;
+		}
+	.arrows {
+		border:none;
+		background:none;
+		}
+	.arrows svg{
+		display: inline-block;
+		vertical-align: text-bottom;
+		}
+	.arrows:disabled svg:hover {
+		opacity: 1;
+		}
+	#popupNav {
+		display: inline-block;
+		float:right;
+		padding:3px;
+		margin-top:5px;
+	}
+	
+	#header{
+		height: 100px;
+		width: 100%;
+		background-color: #00904e;
+		}
+	#title{
+		position:absolute;
+		top: 5px;
+		left: 20px;
+		font-family:'Avenir Next', 'Avenir', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+		font-size: 24px;
+		color: #ffffff;
+		}
+	#titleMobile{
+		position:absolute;
+		left: 10px;
+		top: 0px;
+		margin: 5px;
+		line-height: 1.1;
+		font-family:'Avenir Next', 'Avenir', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+		font-size: 20px;
+		color: #ffffff;
+		}
+	.blk {
+		background-color: black;
+		height: 15px;
+		width: 100%;
+		position: absolute;
+		top: 80px;
+		}
+	.ylw {
+		background-color: #eed800;
+		height: 5px;
+		width: 100%;
+		position: absolute;
+		top: 95px;
+		}
+	#shield {
+		position: absolute;
+		top: 15px;
+		right: 20px;
+	}
+	
+	.modal {
+		font-family:'Avenir Next', 'Avenir', 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+		position: fixed; /* Stay in place */
+		z-index: 2; /* Sit on top */
+		padding-top: 200px; /* Location of the box */
+		left: 0;
+		top: 0;
+		width: 100%; /* Full width */
+		height: 100%; /* Full height */
+		background-color: rgb(0,0,0); /* Fallback color */
+		background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+	}
+
+	.modal-content {
+		position: relative;
+		background-color: #fefefe;
+		margin: auto;
+		padding: 20px;
+		border: 1px solid #888;
+		width: 80%;
+		box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+	}
+	.modal-header,
+	.modal-footer,
+	.modal-body {padding: 2px 16px;}
+	
+	.modal-body a {
+		text-decoration: none;
+		color: #00904e;
+		}
+	.modal-body a:hover{
+		color: #004d2a;
+		}
+	
+	
+	#ok-btn{
+		float:right;
+		padding: 5px;
+		margin-bottom: 20px;
+		width: 70px;
+		height: 30px;
+		font-size:18px;
+		color: #ffffff;
+		background-color: #00904e;
+		border:none;
+		}
+	#ok-btn:disabled,
+	#ok-btn[disabled]{
+		background-color: #cccccc;
+		}
+	#ok-btn:hover{
+		background-color: #004d2a;
 		}
 	@media screen and (max-width: 900px) {
 		#hDiv-large{
@@ -514,26 +806,13 @@
 			}
 	}
 	@media screen and (max-width: 600px) {
-		.esri-view-height-small .esri-ui-corner .esri-component .esri-expand__content{
-			max-width:90vw;
-			margin-left: 2vw;
-		}
+
 		#hDiv-large{
 			min-width: 270px;
 			width: 90vw;
 			height: 90vh;
 			left: 0px;
 		}
-		esri-ui-inner-container esri-ui-corner-container{
-			inset: 6px;
-			}
-		.esri-expand__content--expanded{
-			boxshadow: none;
-			maring:0px;	
-			}
-		.esri-expand__content--expanded{
-			margin-left:0px;
-			}
 		.panel-side {
 			max-height:50%;
 			}
@@ -543,16 +822,97 @@
 		.topnav-active {
 			width: 100%;
 			}
+		#popContainer {
+			min-width:300px;
+			width: auto;
+			position: absolute;
+			bottom: 15px;
+			right: 15px;
+			left:15px;
+			padding: 10px;
+			}
+		#title {
+			display:none;
+		}
+		#titleMobile {
+			display:block !important;
+		}
+		#ok-btn{
+			margin-top:20px;
+			float:none;
+			}
+		.modal{
+			padding-top:50px;
+			font-size:13px;
+			}
+		.modal-content {
+			padding: 0px;
+			}
+			
+		.modal-footer{padding: 2px 10px;}
 	}
+
 	
-	
-		
 
 
 </style>
-  <body>
+<body>
+<div class="box">
+	<div id="myModal" class="modal">
+
+	<!-- Modal content -->
+		<div class="modal-content" >
+			<div class="modal-header">
+				<p><strong>Welcome to our Forest Order Map!</strong></p>
+			</div>
+			<div class="modal-body">
+				<p>This interactive map is being made available to facilitate the display of forest orders. <strong>The signed Order linked in the data in this application remains the authoritative source for an order.</strong></p>
+				<p>This app depicts closure orders on the Caribou-Targhee National Forest. For Orders on other forests, please visit that <a id="link" href="https://www.fs.usda.gov/main/r4/alert-notices" target="_blank">forest's website</a> for more information.</p>
+				<p>This map and its underlying geospatial data are intended to depict physical features as they generally appear on the ground and are not intended to be used to determine title, ownership, legal boundaries, legal jurisdiction, including jurisdiction over roads or trails, or access restrictions that may be in place on either public or private land. Obtain permission before entering private lands, and check with appropriate government offices for restrictions that may apply to public lands.</p><br/><br/>
+			</div>
+			<div class="modal-footer">
+				<input type="checkbox" id="check" name="checkbox1" >
+				<label for="checkbox1"> I agree to the above terms & conditions</label>
+				<button id="ok-btn" disabled>OK</button>
+			</div>
+		</div>
+
+	</div>
+	<div id="header">
+		<p id="title">Forest Orders on the Caribou-Targhee National Forest</p>
+		<p id="titleMobile" style="display:none;">Forest Orders on the</br> Caribou-Targhee<br/>National Forest</p>
+		<a id="shield" href="https://www.fs.usda.gov/r4" target="_blank"><img src="https://www.fs.fed.us/r4/webmaps/Images/Logo/USDA_FS_Shield_White.png" alt="Forest Service Shield" width="120" height="50"></a>
+		<div class="blk"></div>
+		<div class="ylw"></div>
+	</div>
     <div id="viewDiv">
-		<div id="leg">
+		<div id="popContainer">
+			<div id="popupHeader">
+				<button id="plus-btn" style="display:none">
+					<svg class="svg-plus" viewBox="0 0 120 120">
+						<line x1="22.5" y1="90" x2="80" y2="90" stroke-width="5"></line>
+						<line x1="50" y1="60" x2="50" y2="120" stroke-width="5"></line>
+					</svg>
+					<span> Show Order Details</span>
+				</button>
+				<button id="minus-btn">
+					<svg class="svg-plus" viewBox="0 0 120 120">
+						<line x1="22.5" y1="90" x2="80" y2="90" stroke-width="5"></line>
+					</svg>
+					<span> Hide Order Details</span>
+				</button>
+				<div id="popupNav">
+					<button class="arrows" id="next" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 32 32" class="svg-icon-gray"><path d="M25 28h-5L8 16 20 4h5L13 16l12 12z"/></svg></button>
+					<span id="navNums">0 of 0</span>
+					<button class="arrows" id="prev" disabled><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 32 32" class="svg-icon-gray"><path d="M7 4h5l12 12-12 12H7l12-12L7 4z"/></svg></button>
+				</div>
+			</div>
+			<div id="details" style="display:block;">
+				<div id="feature-node" class="esri-widget"></div>
+			</div>
+		</div>
+		
+		<div id="leg" style="display:none;">
 			<h4 style="margin-left:10px; margin-right:10px;">Legend</h4>
 			<div style="background-color: rgba(0, 0, 255,0.25); border:2px solid rgb(0, 0, 255); float:left; height:10px; margin: 5px 20px 0px 10px; width:40px;">&nbsp;</div>
 			<p style="padding: 0px 10px 0px 10px;">Future Forest Orders</p>
@@ -580,14 +940,16 @@
 			<div id="about-div" style="display:none;">
 				<p>This application displays Forest Orders across the forest as well as wider regional Orders.</p>
 				<p>To navigate the map:</p>
-				<p> Click &amp; drag to pan  Use the zoom (+/-) buttons or use the scroll wheel on your mouse.</p>
-				<p> Once you locate the order you'd like to learn more about, click it to view more information in the Order Details panel.</p>
-				<p>To zoom to the Order from the Order Details panel, click the menu in the upper righthand corner of the Order Details panel (A in the image below) and then go to 'Zoom to'.</p>
-				<p>&#65279;Not all Orders are shown on the map. Orders that cover the entire forest, an entire ranger district or the broader regional area are not displayed because they obscure smaller, site-specific Orders.</p>
+				<ul>
+					<li> Click &amp; drag to pan  Use the zoom (+/-) buttons or use the scroll wheel on your mouse.</li>
+					<li> Once you locate the order you'd like to learn more about, click it to view more information in the Order Details panel.</li>
+				</ul>
+				<p>Once you locate the order you'd like to learn more about, click it to view more information in the popup panel.</p>
+				<p>Not all Orders are shown on the map. Orders that cover the entire forest, an entire ranger district or the broader regional area are not displayed because they obscure smaller, site-specific Orders.</p>
 				<p>To view Orders not displayed on this map, click the Forestwide Order List tab above.</p>
 				<p>Please note:</p>
-				<p>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit the that forest's website.</p
-				<p> This map is intended to be used as a supplement to the sign Forest Order. The signed Order document posted on the forest's website remains the authoritative source.</p>
+				<p><i>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit that forest's website.</i></p>
+				<p><i>This map is intended to be used as a supplement to the signed Forest Order. The signed Order document posted on the forest's website remains the authoritative source.</i></p>
 			</div>
 			<div id="about-div-mobile" style="display:none;">
 				<p>This application displays Forest Orders across the forest as well as wider regional Orders.</p>
@@ -601,11 +963,11 @@
 				<p>However when an area is clicked or tapped, all orders that apply to that specific location will be selected, including those that are not symbolized. Scroll through them by using the selection toggle (&#9665; 1 of 9 &#9655;) in the popup.</p>
 				<p>Additionally, all orders, including those that are not symbolized, are included in the Forest Order List.
 				<p>Please note:</p>
-				<p><i>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit the that forest's website.</i></p>
-				<p><i> This map is intended to be used as a supplement to the sign Forest Order. The signed Order document posted on the forest's website remains the authoritative source.<i></p>
+				<p><i>This viewer is used to depict Forest Orders on this national forest. For information on Forest Orders on other national forests, please visit that forest's website.</i></p>
+				<p><i> This map is intended to be used as a supplement to the signed Forest Order. The signed Order document posted on the forest's website remains the authoritative source.<i></p>
 			</div>
 		</div>
 	</div>
-
+	</div>
   </body>
 </html>
